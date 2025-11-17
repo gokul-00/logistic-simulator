@@ -1,6 +1,8 @@
 import streamlit as st
 import random
 import math
+import pandas as pd
+import matplotlib.pyplot as plt
 
 # -----------------------------
 # Constants / Game Parameters
@@ -31,6 +33,8 @@ def init_game_state():
     st.session_state.day = 1
     st.session_state.history = []  # list of dicts per day
     st.session_state.game_over = False
+    st.session_state.show_results = False  # flag to show current day results
+    st.session_state.current_results = None  # store current day results
 
 
 def random_event(day):
@@ -195,7 +199,7 @@ st.sidebar.header("Game Controls")
 
 if st.sidebar.button("🔄 Reset Game", type="primary"):
     init_game_state()
-    st.experimental_rerun()
+    st.rerun()
 
 st.sidebar.markdown(f"### 📅 Day: *{st.session_state.day} / {MAX_DAYS}*")
 
@@ -230,6 +234,105 @@ if st.session_state.day > MAX_DAYS:
 
         st.subheader("Daily Summary")
         st.dataframe(st.session_state.history)
+        
+        # Create graphs showing variation of each parameter across days
+        st.subheader("📊 Performance Trends Over Days")
+        
+        df = pd.DataFrame(st.session_state.history)
+        
+        # Create 4 graphs in 2x2 layout
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.plot(df["day"], df["efficiency_score"], marker='o', linewidth=2, markersize=8, color='#1f77b4')
+            ax.set_xlabel("Day")
+            ax.set_ylabel("Efficiency Score")
+            ax.set_title("Efficiency Score Trend")
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+        
+        with col2:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.plot(df["day"], df["on_time"] * 100, marker='o', linewidth=2, markersize=8, color='#2ca02c')
+            ax.set_xlabel("Day")
+            ax.set_ylabel("On-time Delivery %")
+            ax.set_title("On-time Delivery Trend")
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+        
+        col3, col4 = st.columns(2)
+        
+        with col3:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.plot(df["day"], df["cost_per_order"], marker='o', linewidth=2, markersize=8, color='#d62728')
+            ax.set_xlabel("Day")
+            ax.set_ylabel("Cost per Order (₹)")
+            ax.set_title("Cost per Order Trend")
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+        
+        with col4:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.plot(df["day"], df["co2_per_order"], marker='o', linewidth=2, markersize=8, color='#ff7f0e')
+            ax.set_xlabel("Day")
+            ax.set_ylabel("CO₂ per Order (kg)")
+            ax.set_title("CO₂ Emissions Trend")
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+        
+        # Deliveries vs Demand
+        st.subheader("📦 Delivery Performance")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            x = df["day"]
+            width = 0.35
+            ax.bar(x - width/2, df["demand"], width, label='Demand', alpha=0.8, color='#1f77b4')
+            ax.bar(x + width/2, df["deliveries"], width, label='Delivered', alpha=0.8, color='#2ca02c')
+            ax.set_xlabel("Day")
+            ax.set_ylabel("Orders")
+            ax.set_title("Demand vs Deliveries")
+            ax.legend()
+            ax.grid(True, alpha=0.3, axis='y')
+            st.pyplot(fig)
+        
+        with col2:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.bar(df["day"], df["undelivered"], color='#d62728', alpha=0.8)
+            ax.set_xlabel("Day")
+            ax.set_ylabel("Undelivered Orders")
+            ax.set_title("Undelivered Orders per Day")
+            ax.grid(True, alpha=0.3, axis='y')
+            st.pyplot(fig)
+        
+        # Fleet composition
+        st.subheader("🚗 Fleet Composition")
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            x = df["day"]
+            width = 0.35
+            ax.bar(x - width/2, df["num_petrol"], width, label='Petrol Bikes', alpha=0.8, color='#d62728')
+            ax.bar(x + width/2, df["num_ev"], width, label='EV Scooters', alpha=0.8, color='#2ca02c')
+            ax.set_xlabel("Day")
+            ax.set_ylabel("Number of Vehicles")
+            ax.set_title("Fleet Size Over Days")
+            ax.legend()
+            ax.grid(True, alpha=0.3, axis='y')
+            st.pyplot(fig)
+        
+        with col2:
+            fig, ax = plt.subplots(figsize=(8, 5))
+            ax.plot(df["day"], df["num_micro_hubs"], marker='o', linewidth=2, markersize=8, color='#9467bd')
+            ax.set_xlabel("Day")
+            ax.set_ylabel("Number of Micro-hubs")
+            ax.set_title("Micro-hub Operations Over Days")
+            ax.grid(True, alpha=0.3)
+            st.pyplot(fig)
+    
     st.stop()
 
 st.header(f"📅 Day {st.session_state.day}: Plan Your Operations")
@@ -240,15 +343,12 @@ st.write(
     "then click *Run Simulation* to see outcomes."
 )
 
-if st.button("▶ Run Today's Simulation", type="primary"):
-    day = st.session_state.day
-    results = simulate_day(day, num_petrol, num_ev, ev_share_percent, num_micro_hubs)
-
-    # Save history
-    st.session_state.history.append(results)
-    st.session_state.day += 1
-
-    st.subheader(f"Results for Day {day}")
+# Check if results are ready to be shown
+if st.session_state.show_results and st.session_state.current_results:
+    results = st.session_state.current_results
+    day = results["day"]
+    
+    st.subheader(f"✅ Results for Day {day}")
 
     st.markdown(f"*Event of the Day:* {results['event_name']} – {results['event_desc']}")
 
@@ -283,5 +383,25 @@ if st.button("▶ Run Today's Simulation", type="primary"):
         # Show table
         st.dataframe(st.session_state.history)
 
-else:
-    st.info("Adjust the sliders in the sidebar, then click *Run Today's Simulation* to play this round.")
+    st.markdown("---")
+    
+    # Button to continue to next day
+    if st.button("➡️ Continue to Next Day", type="primary"):
+        st.session_state.show_results = False
+        st.session_state.current_results = None
+        st.rerun()
+        
+elif not st.session_state.show_results:
+    if st.button("▶ Run Today's Simulation", type="primary"):
+        day = st.session_state.day
+        results = simulate_day(day, num_petrol, num_ev, ev_share_percent, num_micro_hubs)
+
+        # Save history
+        st.session_state.history.append(results)
+        st.session_state.current_results = results
+        st.session_state.show_results = True
+        st.session_state.day += 1
+        st.rerun()
+
+    else:
+        st.info("Adjust the sliders in the sidebar, then click *Run Today's Simulation* to play this round.")
