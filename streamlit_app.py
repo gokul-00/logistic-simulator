@@ -191,7 +191,7 @@ def simulate_day(day, num_petrol, num_ev, ev_share_percent, num_micro_hubs):
 # -----------------------------
 # Streamlit App Layout
 # -----------------------------
-st.set_page_config(page_title="Flipkart Last-Mile Simulator", layout="wide")
+st.set_page_config(page_title="Flipkart Last-Mile Simulator", layout="wide", initial_sidebar_state="expanded")
 
 # If matplotlib isn't installed, show a helpful error and stop the app early so the user
 # can install dependencies without hitting a Python traceback.
@@ -216,19 +216,34 @@ if st.sidebar.button("🔄 Reset Game", type="primary"):
     init_game_state()
     st.rerun()
 
-st.sidebar.markdown(f"### 📅 Day: *{st.session_state.day} / {MAX_DAYS}*")
+# Only show day and event if game is not over
+if st.session_state.day <= MAX_DAYS:
+    st.sidebar.markdown(f"### 📅 Day: *{st.session_state.day} / {MAX_DAYS}*")
 
-st.sidebar.write("Make your decisions for *today's operations*:")
+    # Get and display today's event
+    today_event = random_event(st.session_state.day)
+    st.sidebar.markdown("---")
+    st.sidebar.markdown(f"**🌤️ Today's Event:** *{today_event['name']}*")
+    st.sidebar.caption(today_event['desc'])
+    st.sidebar.markdown("---")
 
-num_petrol = st.sidebar.slider("Number of petrol bikes", min_value=0, max_value=200, value=80, step=5)
-num_ev = st.sidebar.slider("Number of EV scooters", min_value=0, max_value=200, value=40, step=5)
-ev_share_percent = st.sidebar.slider("Target % of deliveries by EV", min_value=0, max_value=100, value=40, step=5)
-num_micro_hubs = st.sidebar.slider("Number of micro-hubs to operate", min_value=0, max_value=5, value=2, step=1)
+    st.sidebar.write("Make your decisions for *today's operations*:")
 
-st.sidebar.info(
-    "Tip: Try shifting more volume to EVs while keeping enough capacity. "
-    "Micro-hubs improve on-time performance but add fixed costs."
-)
+    num_petrol = st.sidebar.slider("Number of petrol bikes", min_value=0, max_value=200, value=80, step=5)
+    num_ev = st.sidebar.slider("Number of EV scooters", min_value=0, max_value=200, value=40, step=5)
+    ev_share_percent = st.sidebar.slider("Target % of deliveries by EV", min_value=0, max_value=100, value=40, step=5)
+    num_micro_hubs = st.sidebar.slider("Number of micro-hubs to operate", min_value=0, max_value=5, value=2, step=1)
+
+    st.sidebar.info(
+        "Tip: Try shifting more volume to EVs while keeping enough capacity. "
+        "Micro-hubs improve on-time performance but add fixed costs."
+    )
+else:
+    # Game over - set default values for sliders so they don't error
+    num_petrol = 80
+    num_ev = 40
+    ev_share_percent = 40
+    num_micro_hubs = 2
 
 # Main panel
 if st.session_state.day > MAX_DAYS:
@@ -298,29 +313,18 @@ if st.session_state.day > MAX_DAYS:
         
         # Deliveries vs Demand
         st.subheader("📦 Delivery Performance")
-        col1, col2 = st.columns(2)
         
-        with col1:
-            fig, ax = plt.subplots(figsize=(8, 5))
-            x = df["day"]
-            width = 0.35
-            ax.bar(x - width/2, df["demand"], width, label='Demand', alpha=0.8, color='#1f77b4')
-            ax.bar(x + width/2, df["deliveries"], width, label='Delivered', alpha=0.8, color='#2ca02c')
-            ax.set_xlabel("Day")
-            ax.set_ylabel("Orders")
-            ax.set_title("Demand vs Deliveries")
-            ax.legend()
-            ax.grid(True, alpha=0.3, axis='y')
-            st.pyplot(fig)
-        
-        with col2:
-            fig, ax = plt.subplots(figsize=(8, 5))
-            ax.bar(df["day"], df["undelivered"], color='#d62728', alpha=0.8)
-            ax.set_xlabel("Day")
-            ax.set_ylabel("Undelivered Orders")
-            ax.set_title("Undelivered Orders per Day")
-            ax.grid(True, alpha=0.3, axis='y')
-            st.pyplot(fig)
+        fig, ax = plt.subplots(figsize=(10, 6))
+        x = df["day"]
+        ax.axhline(y=12000, color='#1f77b4', linestyle='--', linewidth=2, label='Expected Demand (12k)', alpha=0.7)
+        ax.plot(x, df["deliveries"], marker='o', linewidth=2, markersize=8, color='#2ca02c', label='Delivered')
+        ax.plot(x, df["undelivered"], marker='s', linewidth=2, markersize=8, color='#d62728', label='Undelivered')
+        ax.set_xlabel("Day")
+        ax.set_ylabel("Orders")
+        ax.set_title("Deliveries vs Expected Demand")
+        ax.legend()
+        ax.grid(True, alpha=0.3)
+        st.pyplot(fig)
         
         # Fleet composition
         st.subheader("🚗 Fleet Composition")
@@ -402,6 +406,7 @@ if st.session_state.show_results and st.session_state.current_results:
     
     # Button to continue to next day
     if st.button("➡️ Continue to Next Day", type="primary"):
+        st.session_state.day += 1
         st.session_state.show_results = False
         st.session_state.current_results = None
         st.rerun()
@@ -415,7 +420,6 @@ elif not st.session_state.show_results:
         st.session_state.history.append(results)
         st.session_state.current_results = results
         st.session_state.show_results = True
-        st.session_state.day += 1
         st.rerun()
 
     else:
