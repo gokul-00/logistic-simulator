@@ -2,7 +2,13 @@ import streamlit as st
 import random
 import math
 import pandas as pd
-import matplotlib.pyplot as plt
+# Try to import matplotlib; if it's missing we'll show a friendly message in the app.
+try:
+    import matplotlib.pyplot as plt
+    _MATPLOTLIB_AVAILABLE = True
+except ImportError:
+    plt = None
+    _MATPLOTLIB_AVAILABLE = False
 
 # -----------------------------
 # Constants / Game Parameters
@@ -186,6 +192,15 @@ def simulate_day(day, num_petrol, num_ev, ev_share_percent, num_micro_hubs):
 # Streamlit App Layout
 # -----------------------------
 st.set_page_config(page_title="Flipkart Last-Mile Simulator", layout="wide")
+
+# If matplotlib isn't installed, show a helpful error and stop the app early so the user
+# can install dependencies without hitting a Python traceback.
+if not _MATPLOTLIB_AVAILABLE:
+    st.title("📦 Flipkart: Last-Mile Logistics Simulator")
+    st.error(
+        "Missing dependency: `matplotlib`.\n\nInstall it with `pip install matplotlib` or `pip install -r requirements.txt`, then restart the app."
+    )
+    st.stop()
 
 st.title("📦 Flipkart: Last-Mile Logistics Simulator")
 st.caption("You are the logistics manager of a Tier-II city. Make daily decisions and balance cost, on-time delivery, and emissions.")
